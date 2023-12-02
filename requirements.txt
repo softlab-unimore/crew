@@ -1,0 +1,18 @@
+# boto3
+# botocore
+# jsonlines
+
+numpy
+tqdm
+scipy
+scikit-learn
+# requests
+# six
+# regex
+
+lime
+pandas
+# torch
+matplotlib
+torcheval
+transformers
