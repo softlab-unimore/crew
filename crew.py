@@ -1,7 +1,156 @@
 import argparse
+import json
+import os
+import pickle
 
-import explain
+import numpy as np
+import torch
+from torch.utils.data import SequentialSampler, DataLoader
+from tqdm import tqdm
+from transformers import AutoModelForSequenceClassification, BertTokenizer
+
+import expldf
+from data_parser import load_and_cache_examples
+from embeddings_cache import BERT4SeqClf, EMBS
+from eval_measures import PostHocAccuracy
+from groups import get_text_groups
+from lime_corrclust import LimeCorrClust
 from my_corrclust import cc_weights
+from prefix_words import prefix_words_to_feature, get_words_attrs_mask
+from utils import set_seed, uniquify, EXEC_TIME_PROFILER, bindump
+
+
+def crew(args):
+    if args.device == 'cuda':
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+        torch.cuda.empty_cache()
+
+    set_seed(args)
+
+    model_class, tokenizer_class = AutoModelForSequenceClassification, BertTokenizer
+    model = model_class.from_pretrained(args.model_dir)
+    tokenizer = tokenizer_class.from_pretrained(args.model_dir, do_lower_case=args.do_lower_case)
+    model.to(args.device)
+    model.eval()
+
+    model = BERT4SeqClf(model, tokenizer, args.device, model.bert)
+    EMBS.work_with(model)
+
+    dataset = load_and_cache_examples(args, args.task_name, tokenizer, 'test')
+
+    exp_dir = uniquify(f'{args.output_dir}/{args.model_setup}')
+    os.makedirs(exp_dir)
+    with open(f'{exp_dir}/args.json', 'w') as f:
+        json.dump(args.__dict__, f, indent=2)
+
+    eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
+    ds_sampler = SequentialSampler(dataset)
+    ds_dloader = DataLoader(dataset, sampler=ds_sampler, batch_size=eval_batch_size)
+
+    count = -1
+    acc = PostHocAccuracy()
+
+    wout = expldf.ExplDataFrame()
+    gout = expldf.ExplDataFrame(True)
+
+    EXEC_TIME_PROFILER.reset()
+
+    # lime_cache = None
+    lime_cache_name = f'lime_cache_{len(dataset)}_{args.lime_n_word_samples}'
+    if args.lime_n_word_features > 0:
+        lime_cache_name += f'_{args.lime_n_word_features}'
+    lime_cache_path = f'./{args.data_dir}/{lime_cache_name}'
+    if os.path.exists(lime_cache_path):
+        lime_cache = pickle.load(open(lime_cache_path, 'rb'))
+        lime_cached = True
+    else:
+        lime_cache = None
+        lime_cached = False
+
+    _lime_corrclust = LimeCorrClust(args, model, tokenizer, lime_cache)
+    if lime_cache is None:
+        lime_cache = [[], [], []]
+
+    for batch in tqdm(ds_dloader, desc='Evaluating'):
+        EXEC_TIME_PROFILER.start()
+
+        set_seed(args)
+        count += 1
+
+        batch = tuple(t.to(args.device) for t in batch)
+
+        words, segments_ids, attrs_mask, prefix_words_a, prefix_words_b = get_words_attrs_mask(
+            batch[0][0], batch[2][0], batch[4][0], tokenizer, args.wordpieced)
+
+        _prefix_words = prefix_words_a + prefix_words_b
+        # prefix_words_tags = ['cls'] + prefix_words_a + ['sep'] + prefix_words_b + ['sep']
+        prefix_words_tags = _prefix_words
+
+        # BERT classification
+        input_ids_ = batch[0]
+        attention_mask_ = batch[1]
+        segments_ids_ = batch[2]
+
+        logits = model.predict(None, input_ids_, attention_mask_, segments_ids_, args.wordpieced)
+        logits = logits.detach().cpu().numpy()
+        pred = logits.argmax(axis=1)
+
+        idxs, word_scores, groups, group_scores = _lime_corrclust.lime_corrclust(
+            prefix_words_tags, words, attrs_mask, segments_ids, None, count)
+
+        if len(idxs) == len(_prefix_words):
+            w_probs = logits
+        else:
+            top_prefix_words = [prefix_words_tags[i] for i in idxs]
+            f = prefix_words_to_feature(top_prefix_words, segments_ids, tokenizer, args.wordpieced, args.max_seq_length)
+            input_ids_ = torch.tensor([f.input_ids], device=args.device)
+            attention_mask_ = torch.tensor([f.input_mask], device=args.device)
+            segment_ids_ = torch.tensor([f.segment_ids], device=args.device)
+            logits_ = model.predict(None, input_ids_, attention_mask_, segment_ids_, args.wordpieced)
+            w_probs = logits_.detach().cpu().numpy()
+
+        expl_pred = np.argmax(w_probs)
+        if not lime_cached:
+            lime_cache[0].append([prefix_words_tags[i] for i in idxs])
+            lime_cache[1].append(word_scores.tolist())
+            lime_cache[2].append(w_probs.tolist())
+
+        acc.append(pred[0], expl_pred)
+
+        wout.add_rows(count,
+                      impact=word_scores,
+                      word=[words[i] for i in idxs],
+                      wid_word=[prefix_words_tags[i] for i in idxs],
+                      column=[int(attrs_mask[i]) for i in idxs],
+                      segment=[int(segments_ids[i]) for i in idxs],
+                      wid=idxs
+                      )
+
+        gout.add_rows(count,
+                      group=get_text_groups({i: g for i, g in enumerate(groups)}, prefix_words_tags),
+                      impact=group_scores,
+                      wids=groups,
+                      )
+
+        EXEC_TIME_PROFILER.timestep('stuff')
+
+    bindump(wout.get_df(), f'{exp_dir}/wexpls')
+    bindump(gout.get_df(), f'{exp_dir}/gexpls')
+    bindump((str(os.uname()), EXEC_TIME_PROFILER.get_list()), f'{exp_dir}/exec_time_profile.pkl')
+
+    ret = {
+        'Post-hoc accuracy': acc.get_score(),
+        # 'Degradation score': degrad_score.get_score(),
+    }
+    for k, v in ret.items():
+        print(k, v)
+    bindump(ret, f'{exp_dir}/return.pkl')
+
+    if not lime_cached:
+        bindump(lime_cache, lime_cache_path)
+
+    print('All done!')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -64,4 +213,4 @@ if __name__ == '__main__':
     args.device = 'cuda' if args.gpu else 'cpu'
     args.n_gpu = 1
 
-    explain.main(args)
+    crew(args)

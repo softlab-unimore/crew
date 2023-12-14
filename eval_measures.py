@@ -60,9 +60,11 @@ class CReWDegradPredict(DegradPredict):
         self._size = len(self.idxs)
 
     def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
-        if n > 0:
+        # if n > 0:
+        if float(n) >= pct and n >= 0:
             i = n
-        elif pct > 0.:
+        # elif pct > 0.:
+        elif pct >= float(n) and pct >= 0:
             i = round(pct * float(self.size()))
             # i = max(i, 1)  # degradation must be greater than 0
         else:
@@ -94,17 +96,18 @@ class CReWDegradPredict(DegradPredict):
         if len(self.always_drop_idxs) > 0:
             keep[self.always_drop_idxs] = False
         input_ids_ = self.input_ids[keep]
+        segments_ = self.segment_ids[keep]
 
         if self.wordpieced:
             attention_mask_ = self.attention_mask[keep]
             segment_ids_ = self.segment_ids[keep]
         else:
             words = input_ids_
-            wordpieces, _, segment_ids_ = words_to_wordpieces(self.tokenizer, words, None)
+            wordpieces, _, segment_ids_ = words_to_wordpieces(self.tokenizer, segments_, words, None)
             input_ids_ = self.tokenizer.convert_tokens_to_ids(wordpieces)
-            input_ids_ = torch.tensor(input_ids_, device=self.device)
-            attention_mask_ = torch.tensor([1] * len(input_ids_), device=self.device)
-            segment_ids_ = torch.tensor(segment_ids_, device=self.device)
+            input_ids_ = torch.tensor(input_ids_, device=self.device).long()
+            attention_mask_ = torch.tensor([1] * len(input_ids_), device=self.device).long()
+            segment_ids_ = torch.tensor(segment_ids_, device=self.device).long()
 
         return input_ids_, attention_mask_, segment_ids_
 
@@ -123,9 +126,11 @@ class CReWDegradPredict(DegradPredict):
 class CReWDegradPredictGroups(CReWDegradPredict):
 
     def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
-        if n > 0:
+        # if n > 0:
+        if float(n) >= pct and n >= 0:
             i = n
-        elif pct > 0.:
+        # elif pct > 0.:
+        elif pct >= float(n) and pct >= 0:
             i = round(pct * float(self.size()))
         else:
             return [0, 0]  # possibly raise exception
@@ -282,7 +287,8 @@ class DegradationScoreF1(DegradationMetric):
         self._lerf_f1 = None
         self._morf_f1 = None
 
-    def append(self, degrad_predict: DegradPredict, y_true: int):
+    def append(self, degrad_predict: DegradPredict):#, y_true: int):
+        y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0).detach().cpu().numpy())
         self.true.append(y_true)
         morf_degrads, lerf_degrads = [], []
 

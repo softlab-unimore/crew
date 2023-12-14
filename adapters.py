@@ -28,15 +28,19 @@ def words_to_wordpieces_pair(tokenizer, words_a, words_b, attrs_mask_a, attrs_ma
         attrs_mask_a_ = []
         attrs_mask_b_ = []
 
-
     return words_a_, words_b_, attrs_mask_a_, attrs_mask_b_
 
 
-def words_to_wordpieces(tokenizer, words, attrs_mask=None):
-    words_a, words_b, attrs_mask_a, attrs_mask_b = words_seq_to_pair(words, attrs_mask)
+def words_to_wordpieces(tokenizer, segments, words, attrs_mask=None):
+    words_a, words_b, attrs_mask_a, attrs_mask_b = words_seq_to_pair(segments, words, attrs_mask)
 
     wordpieces_a, wordpieces_b, attrs_mask_a_, attrs_mask_b_ = words_to_wordpieces_pair(
         tokenizer, words_a, words_b, attrs_mask_a, attrs_mask_b)
+
+    wordpieces_a = ['[CLS]'] + wordpieces_a + ['[SEP]']
+    wordpieces_b = wordpieces_b + ['[SEP]']
+    attrs_mask_a_ = [-1] + attrs_mask_a_ + [-1]
+    attrs_mask_b_ = attrs_mask_b_ + [-1]
 
     words, attrs_mask, segment_ids = words_pair_to_seq(wordpieces_a, wordpieces_b, attrs_mask_a_, attrs_mask_b_)
     return words, attrs_mask, segment_ids
@@ -76,13 +80,47 @@ def words_pair_to_seq(words_a, words_b, attrs_mask_a=None, attrs_mask_b=None):
     if not attrs_mask_b:
         attrs_mask_b = [-1] * len(words_b)
 
-    words = ['[CLS]'] + words_a + ['[SEP]'] + words_b + ['[SEP]']
-    attrs_mask = [-1] + attrs_mask_a + [-1] + attrs_mask_b + [-1]
-    segment_ids = [0] + [0] * len(words_a) + [0] + [1] * len(words_b) + [1]
+    # words = ['[CLS]'] + words_a + ['[SEP]'] + words_b + ['[SEP]']
+    # attrs_mask = [-1] + attrs_mask_a + [-1] + attrs_mask_b + [-1]
+    # segment_ids = [0] + [0] * len(words_a) + [0] + [1] * len(words_b) + [1]
+    words = words_a + words_b
+    attrs_mask = attrs_mask_a + attrs_mask_b
+    segment_ids = [0] * len(words_a) + [1] * len(words_b)
     return words, attrs_mask, segment_ids
 
 
-def words_seq_to_pair(words, attrs_mask=None):
+# def words_seq_to_pair_(words, attrs_mask=None):
+#     if attrs_mask is None or len(attrs_mask) == 0:
+#         attrs_mask = [-1] * len(words)
+#
+#     words_a = []
+#     words_b = []
+#     attrs_mask_a = []
+#     attrs_mask_b = []
+#
+#     seps = 0
+#     for w, a in zip(words, attrs_mask):
+#         if w == '[CLS]':
+#             continue
+#         elif w == '[SEP]':
+#             seps += 1
+#             if seps == 2:
+#                 break
+#             else:
+#                 continue
+#         else:
+#             (words_b if seps == 1 else words_a).append(w)
+#             (attrs_mask_b if seps == 1 else attrs_mask_a).append(int(a))
+#
+#     return words_a, words_b, attrs_mask_a, attrs_mask_b
+
+
+def words_seq_to_pair(segments, words, attrs_mask=None):
+    for i in range(len(segments) - 1):
+        if segments[i] > 0 >= segments[i + 1]:
+            segments = segments[:i+1]
+            break
+
     if attrs_mask is None or len(attrs_mask) == 0:
         attrs_mask = [-1] * len(words)
 
@@ -91,18 +129,11 @@ def words_seq_to_pair(words, attrs_mask=None):
     attrs_mask_a = []
     attrs_mask_b = []
 
-    seps = 0
-    for w, a in zip(words, attrs_mask):
-        if w == '[CLS]':
+    for w, a, s in zip(words, attrs_mask, segments):
+        if w in ['[CLS]', '[SEP]']:
             continue
-        elif w == '[SEP]':
-            seps += 1
-            if seps == 2:
-                break
-            else:
-                continue
         else:
-            (words_b if seps == 1 else words_a).append(w)
-            (attrs_mask_b if seps == 1 else attrs_mask_a).append(int(a))
+            (words_b if s == 1 else words_a).append(w)
+            (attrs_mask_b if s == 1 else attrs_mask_a).append(int(a))
 
     return words_a, words_b, attrs_mask_a, attrs_mask_b

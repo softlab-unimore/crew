@@ -94,7 +94,7 @@ class BERT4SeqClf(ModelWrapper):
             else:
                 tokens, segment_ids = [], []
                 for w in words:
-                    t, _, s = words_to_wordpieces(self.tokenizer, w, None)
+                    t, _, s = words_to_wordpieces(self.tokenizer, segment_ids, w, None)
                     tokens.append(t)
                     segment_ids.append(s)
             token_ids = [self.tokenizer.convert_tokens_to_ids(t) for t in tokens]

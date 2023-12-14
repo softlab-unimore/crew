@@ -60,9 +60,12 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('expls_dir', type=str)
-    parser.add_argument('expl_id', type=int)
-    parser.add_argument('visual_dir', type=str)
+    parser.add_argument('expls_dir', type=str,
+                        help='The directory with the explanations in binary format (the CREW output)')
+    parser.add_argument('expl_id', type=int,
+                        help='The position of the explanation for the desired pair of entity descriptions')
+    parser.add_argument('visual_dir', type=str,
+                        help='The directory where to write the .html the visualizes the explanation')
 
     args = parser.parse_args()
 

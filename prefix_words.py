@@ -17,24 +17,6 @@ def indexes_to_prefix_words(idxs, words):
     return prefix_words
 
 
-def indexes_to_prefix_words_(idxs, words, segment_ids, attrs_mask):
-    prefix_words = []
-    for ix in idxs:
-        s = segment_ids[ix]
-        a = attrs_mask[ix]
-        w = words[ix]
-        prefix_words.append(f'{s}_{a}_{ix}_{w}')
-    return prefix_words
-
-
-# def get_segment_id(prefix_word: str) -> int:
-#     return int(re.match('(\d)_\d+_\d+_', prefix_word).group(1))
-
-
-# def get_attr(prefix_word: str) -> int:
-#     return int(re.match('\d_(\d+)_\d+_', prefix_word).group(1))
-
-
 def get_idx(prefix_word: str) -> int:
     # return int(re.match('\d_\d+_(\d+)_', prefix_word).group(1))
     return int(re.match('(\d+)_', prefix_word).group(1))
@@ -52,7 +34,7 @@ def get_words_attrs_mask(
     for id in input_ids:
         words.append(tokenizer.ids_to_tokens[int(id)])
 
-    words_a, words_b, attrs_mask_a, attrs_mask_b = words_seq_to_pair(words, attrs_mask)
+    words_a, words_b, attrs_mask_a, attrs_mask_b = words_seq_to_pair(segment_ids, words, attrs_mask)
     if not wordpieced:
         attrs_mask_dev = attrs_mask.device
         seg_ids_device = segment_ids.device
@@ -64,11 +46,10 @@ def get_words_attrs_mask(
 
     words = np.array(words)
 
-    # prefix_words_a = indexes_to_prefix_words(range(1, 1 + len(words_a)), words, segment_ids, attrs_mask)
-    # prefix_words_b = indexes_to_prefix_words(range(1 + len(words_a) + 1, 1 + len(words_a) + 1 + len(words_b)),
-    #                                          words, segment_ids, attrs_mask)
-    prefix_words_a = indexes_to_prefix_words(range(1, 1 + len(words_a)), words)
-    prefix_words_b = indexes_to_prefix_words(range(1 + len(words_a) + 1, 1 + len(words_a) + 1 + len(words_b)), words)
+    # prefix_words_a = indexes_to_prefix_words(range(1, 1 + len(words_a)), words)
+    # prefix_words_b = indexes_to_prefix_words(range(1 + len(words_a) + 1, 1 + len(words_a) + 1 + len(words_b)), words)
+    prefix_words_a = indexes_to_prefix_words(range(0, len(words_a)), words)
+    prefix_words_b = indexes_to_prefix_words(range(len(words_a), len(words_a) + len(words_b)), words)
 
     return words, segment_ids, attrs_mask, prefix_words_a, prefix_words_b
 
