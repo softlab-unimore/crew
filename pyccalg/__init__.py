@@ -43,7 +43,7 @@ def _running_time_ms(start):
 
 
 def _map_cluster(cluster, id2vertex):
-    return {id2vertex[u] for u in cluster}
+    return tuple(id2vertex[u] for u in sorted(cluster))
 
 
 def _vertex_pair_id(i, j, n):

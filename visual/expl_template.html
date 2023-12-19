@@ -3,7 +3,6 @@
 
 <head>
 	<script src="../../../script.js"></script>
-	<script src="../../../myscript.js"></script>
 </head>
 
 <body>
@@ -11,9 +10,27 @@
 
 	<script>
 		let predict_proba = "<!--PRED_PROB-->"
-		let _top_words_coefs = "<!--BAR_CHART-->"
-		let _words_coefs = "<!--HIGHLIGHTED_TEXT-->"
-		visual()
+		let top_words_coefs = "<!--BAR_CHART-->"
+		// let _words_coefs = "<!--HIGHLIGHTED_TEXT-->"
+		let groups = false
+		let words_coefs = "WORDS_COEFS"
+		let raw_text_ = "RAW_TEXT"
+
+		var top_div = d3.select('#top_div54C11HAMC3G6B7T').classed('lime top_div', true);
+		var pp_div = top_div.append('div').classed('lime predict_proba', true);
+		var pp_svg = pp_div.append('svg').style('width', '100%');
+		var pp = new lime.PredictProba(pp_svg, ["no_match", "match"], predict_proba);
+
+		var exp_div;
+		var exp = new lime.Explanation(["no_match", "match"]);
+		exp_div = top_div.append('div').classed('lime explanation', true);
+
+		exp.show(top_words_coefs, 1, exp_div);
+
+		var raw_div = top_div.append('div');
+
+		// console.log(words_coefs, raw_text_)
+		exp.show_raw_text(words_coefs, 1, raw_text_, raw_div, true);
 	</script>
 </body>
 </html>

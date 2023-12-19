@@ -143,7 +143,7 @@ def corrclust(dataset, algorithm):
             # print('Cluster ' + str(c) + ': ' + str(sorted(mapped_cluster)))
             # c += 1
             ret.append(_map_cluster(cluster, id2vertex))
-        return np.array(ret)
+        return np.array(ret, dtype=object)
 
     # should never get here
     raise Exception(f'ERROR: algorithm={algorithm}')
