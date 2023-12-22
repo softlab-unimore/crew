@@ -1,22 +1,15 @@
 import re
 
 import numpy as np
-import torch
 
-from corrclust import corrclust
-from embeddings_cache import ModelWrapper
+from pyccalg import cc
+from models import ModelWrapper
 from groups import get_text_groups
 from interpret_lime import MyLIMETextExplainer
 from my_corrclust import get_cc_scores_table
-from prefix_words import get_idx, prefix_words_to_feature
+from prefix_words import get_idx, get_word
 from utils import EXEC_TIME_PROFILER
 from wordcorr import EmbdngWordCorr, ImpactWordCorr, SchemaWordCorr
-
-
-# def get_text_groups(ix_groups, data):
-#     text_groups = [[data[ix] for ix in g] for g in ix_groups]
-#     text_groups = [f'{_gr_id}__{"__".join(_pw)}' for _gr_id, _pw in enumerate(text_groups)]
-#     return text_groups
 
 
 def groups_same_word_v1(words):
@@ -52,7 +45,7 @@ def groups_same_word_v2(words, mask):
     return groups
 
 
-class LimeCorrClust:
+class CREW:
 
     def __init__(self, args, model: ModelWrapper, tokenizer, lime_cache=None):
         self.args = args
@@ -76,10 +69,7 @@ class LimeCorrClust:
             args.max_seq_length, args.seed)
         self.num_features = args.lime_n_word_features
 
-    def lime_corrclust(self, prefix_words_tags, words, attrs_mask, segments_ids, pred_probs, count=None):
-        skip_tags = np.array([w not in ['[CLS]', '[SEP]'] for w in words])
-        _prefix_words = np.array(prefix_words_tags)[skip_tags]
-        # words = [w if w in ['[CLS]', '[SEP]'] else get_word(w) for w in a_no_match[_ix_words]]
+    def explain(self, prefix_words, attrs_mask, segments_ids, count=None):
 
         # ### v1
         # _prefix_words = get_text_groups(groups_same_word_v1(words), prefix_words_tags)
@@ -91,20 +81,7 @@ class LimeCorrClust:
         # _prefix_words = get_text_groups(groups_same_word_v2(words, attrs_mask.detach().cpu().numpy()), prefix_words_tags)
 
         if not self.lime_cached:
-            top_prefix_words, top_scores = self.lime_words_explainer.explain(' '.join(_prefix_words), segments_ids)
-
-            # if len(top_prefix_words) == len(_prefix_words):
-            #     # out_probs = pred_probs
-            #     pass
-            # else:
-            #     # f = prefix_words_to_feature(top_prefix_words, segments_ids, self.tokenizer, self.args.wordpieced,
-            #     #                             self.args.max_seq_length)
-            #     # input_ids_ = torch.tensor([f.input_ids], device=self.args.device)
-            #     # attention_mask_ = torch.tensor([f.input_mask], device=self.args.device)
-            #     # segment_ids_ = torch.tensor([f.segment_ids], device=self.args.device)
-            #     # logits_ = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.args.wordpieced)
-            #     # out_probs = logits_.detach().cpu().numpy()
-            #     pass
+            top_prefix_words, top_scores = self.lime_words_explainer.explain(' '.join(prefix_words), segments_ids)
 
             # __out_prefix_words = []
             # __out_scores = []
@@ -122,26 +99,20 @@ class LimeCorrClust:
             # top_prefix_words = __out_prefix_words[__arg_sort]
             # top_scores = __out_scores[__arg_sort]
 
-            # self.lime_wexpl[0].append(top_prefix_words.tolist())
-            # self.lime_wexpl[1].append(top_scores.tolist())
-            # self.lime_wexpl[2].append(out_probs[0].tolist())
-
         else:
             top_prefix_words = np.array(self.lime_wexpl[0][count])  # - 1])
             top_scores = np.array(self.lime_wexpl[1][count])  # - 1])
-            # out_probs = [np.array(self.lime_wexpl[2][count])]  # - 1])]
 
         EXEC_TIME_PROFILER.timestep('lime_words')
 
-        # w_probs = out_probs[0]#.argmax()
         idxs = np.array([get_idx(pw) for pw in top_prefix_words])
 
-        word_scores = [0] * len(words)
+        word_scores = [0] * len(prefix_words)
         for ix, s in zip(idxs, top_scores):
             word_scores[ix] = s
         word_scores = np.array(word_scores)
 
-        # g_probs = None
+        words = [get_word(pw) for pw in prefix_words]
         wordcorrs = {
             'emb_sim': EmbdngWordCorr(words),
             'impacts': ImpactWordCorr(word_scores),
@@ -152,15 +123,11 @@ class LimeCorrClust:
         EXEC_TIME_PROFILER.timestep('graph')
 
         if len(np.unique(cc_scores_table[:, 2:3])) == 1:
-            groups = [[get_idx(pw) for pw in _prefix_words]]
-            # prefix_words_groups = [_prefix_words]
+            groups = [[get_idx(pw) for pw in prefix_words]]
         else:
-            groups = corrclust(cc_scores_table, self.args.cc_alg)
+            groups = cc(cc_scores_table, self.args.cc_alg)
             EXEC_TIME_PROFILER.timestep('corrclust')
-            # prefix_words_groups = [[prefix_words_tags[ix] for ix in sorted(g)] for g in groups]
-            # text_groups = ['__'.join(pwg) for pwg in prefix_words_groups]
-            # text_groups = [f'{i}__{tg}' for i, tg in enumerate(text_groups)]
-        text_groups = get_text_groups(groups.tolist(), prefix_words_tags)
+        text_groups = get_text_groups(groups.tolist(), prefix_words)
 
         text_groups_by_score, groups_scores = self.lime_group_explainer.explain(" ".join(text_groups), segments_ids)
         if len(groups) > 1:
@@ -170,11 +137,6 @@ class LimeCorrClust:
                 group_scores_desc_ix[gix] = s
             group_scores_desc_ix = np.array(group_scores_desc_ix).argsort()[::-1]
             groups = groups[group_scores_desc_ix]
-        # g_probs = w_probs
-
-        # self.lime_gexpl[0].append(text_groups_by_score.tolist())
-        # self.lime_gexpl[1].append(groups_scores.tolist())
-        # self.lime_gexpl[2].append(out_probs[0].tolist())
 
         EXEC_TIME_PROFILER.timestep('lime_groups')
 

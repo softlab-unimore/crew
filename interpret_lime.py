@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from lime.lime_text import LimeTextExplainer
 
-from embeddings_cache import ModelWrapper
+from models import ModelWrapper
 from prefix_words import get_idx, get_word
 # from utils import EXEC_TIME_PROFILER
 from data_parser import InputExample, convert_examples_to_features

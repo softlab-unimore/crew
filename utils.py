@@ -161,3 +161,17 @@ def bindump(data, filepath: str, overwrite=True):
     binfile = open(filepath, 'wb')
     pickle.dump(data, binfile)
     binfile.close()
+
+
+def flatten(arr2d):
+    try:
+        ret = []
+        for arr1d in iter(arr2d):
+            try:
+                for x in iter(arr1d):
+                    ret.append(x)
+            except TypeError:
+                ret.append(arr1d)
+    except TypeError:
+        ret = arr2d
+    return ret
