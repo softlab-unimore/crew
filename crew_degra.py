@@ -24,32 +24,44 @@ class CReWDegradPredict(DegradPredict):
 
         self._size = len(self.idxs)
 
-    def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
-        # if n > 0:
+    def _get_arg_to_drop(self, n, pct, more_relv_first):
         if float(n) >= pct and n >= 0:
             i = n
-        # elif pct > 0.:
         elif pct >= float(n) and pct >= 0:
             i = round(pct * float(self.size()))
-            # i = max(i, 1)  # degradation must be greater than 0
         else:
-            return [0, 0]  # possibly raise exception
+            return [0, 0]  # raise exception
         if i == 0:
-            idxs_to_drop = []
+            arg_to_drop = []
         else:
-            # idxs_to_drop = np.array(flatten(self.idxs[:i]) if more_relv_first else flatten(self.idxs[-i:]))
-            idxs_to_drop = np.array(self.idxs[:i] if more_relv_first else self.idxs[-i:])
+            arg_to_drop = np.array(self.idxs[:i] if more_relv_first else self.idxs[-i:])
+        return arg_to_drop
 
-        # input_ids_, attention_mask_, segment_ids_ = self._degrad(idxs_to_drop)
-        #
-        # input_ids_ = input_ids_.unsqueeze(0)
-        # attention_mask_ = attention_mask_.unsqueeze(0)
-        # segment_ids_ = segment_ids_.unsqueeze(0)
-        #
-        # # degrad_probs = predict(self.model, input_ids_, attention_mask_, segment_ids_)[0]
-        # degrad_probs = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.wordpieced)[0]
-        # return degrad_probs
-        return self._degrad_predict(idxs_to_drop)
+    def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
+        # # if n > 0:
+        # if float(n) >= pct and n >= 0:
+        #     i = n
+        # # elif pct > 0.:
+        # elif pct >= float(n) and pct >= 0:
+        #     i = round(pct * float(self.size()))
+        #     # i = max(i, 1)  # degradation must be greater than 0
+        # else:
+        #     return [0, 0]  # possibly raise exception
+        # if i == 0:
+        #     idxs_to_drop = []
+        # else:
+        #     # idxs_to_drop = np.array(flatten(self.idxs[:i]) if more_relv_first else flatten(self.idxs[-i:]))
+        #     idxs_to_drop = np.array(self.idxs[:i] if more_relv_first else self.idxs[-i:])
+        idxs_to_drop = self._get_arg_to_drop(n, pct, more_relv_first)
+        input_ids_, attention_mask_, segment_ids_ = self._degrad(idxs_to_drop)
+
+        input_ids_ = input_ids_.unsqueeze(0)
+        attention_mask_ = attention_mask_.unsqueeze(0)
+        segment_ids_ = segment_ids_.unsqueeze(0)
+        degrad_probs = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.wordpieced)
+        degrad_probs = degrad_probs[0].detach().cpu().numpy()
+        # return self._degrad_predict(idxs_to_drop)
+        return degrad_probs
 
     def size(self):
         return self._size
@@ -76,21 +88,22 @@ class CReWDegradPredict(DegradPredict):
 
         return input_ids_, attention_mask_, segment_ids_
 
-    def _degrad_predict(self, idxs_to_drop):
-        input_ids_, attention_mask_, segment_ids_ = self._degrad(idxs_to_drop)
-
-        input_ids_ = input_ids_.unsqueeze(0)
-        attention_mask_ = attention_mask_.unsqueeze(0)
-        segment_ids_ = segment_ids_.unsqueeze(0)
-
-        # degrad_probs = predict(self.model, input_ids_, attention_mask_, segment_ids_)[0]
-        degrad_probs = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.wordpieced)[0]
-        return degrad_probs
+    # def _degrad_predict(self, idxs_to_drop):
+    #     input_ids_, attention_mask_, segment_ids_ = self._degrad(idxs_to_drop)
+    #
+    #     input_ids_ = input_ids_.unsqueeze(0)
+    #     attention_mask_ = attention_mask_.unsqueeze(0)
+    #     segment_ids_ = segment_ids_.unsqueeze(0)
+    #
+    #     # degrad_probs = predict(self.model, input_ids_, attention_mask_, segment_ids_)[0]
+    #     degrad_probs = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.wordpieced)[0]
+    #     return degrad_probs
 
 
 class CReWDegradPredictGroups(CReWDegradPredict):
 
-    def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
+    # def get_degrad_probs(self, n: int = 0, pct: float = 0., more_relv_first=True):
+    def _get_arg_to_drop(self, n, pct, more_relv_first):
         # if n > 0:
         if float(n) >= pct and n >= 0:
             i = n
@@ -98,19 +111,10 @@ class CReWDegradPredictGroups(CReWDegradPredict):
         elif pct >= float(n) and pct >= 0:
             i = round(pct * float(self.size()))
         else:
-            return [0, 0]  # possibly raise exception
+            return [0, 0]  # raise exception
         if i == 0:
             idxs_to_drop = []
         else:
             idxs_to_drop = np.array(flatten(self.idxs[:i]) if more_relv_first else flatten(self.idxs[-i:]))
-
-        # input_ids_, attention_mask_, segment_ids_ = self._degrad(idxs_to_drop)
-        #
-        # input_ids_ = input_ids_.unsqueeze(0)
-        # attention_mask_ = attention_mask_.unsqueeze(0)
-        # segment_ids_ = segment_ids_.unsqueeze(0)
-        #
-        # # degrad_probs = predict(self.model, input_ids_, attention_mask_, segment_ids_)[0]
-        # degrad_probs = self.model.predict(None, input_ids_, attention_mask_, segment_ids_, self.wordpieced)[0]
-        # return degrad_probs
-        return self._degrad_predict(idxs_to_drop)
+        # return self._degrad_predict(idxs_to_drop)
+        return idxs_to_drop

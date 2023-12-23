@@ -90,7 +90,7 @@ def visualize(expls_dir, expl_id, visual_dir):
     tot_len += 1
     vexpl_by_imp = []
     raw_groups = ''
-    for _, gr in expl.sort_values('gimpact', ascending=False).groupby('gid'):
+    for _, gr in expl.sort_values('gimpact', ascending=False).groupby('gid', sort=False):
         for x in gr.apply(lambda s: pd.Series([s['word'], 0, s['gimpact']]), axis=1).values.tolist():
             x[1] = tot_len
             tot_len += len(x[0]) + 1

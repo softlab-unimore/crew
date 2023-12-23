@@ -11,7 +11,7 @@ from transformers import BertTokenizer
 from utils import bindump
 from embeddings_cache import EMBS
 from models import BERT4SeqClf
-from eval_measures import CReWDegradPredict, CReWDegradPredictGroups
+from crew_degra import CReWDegradPredict, CReWDegradPredictGroups
 from phevals import DegradationScoreF1
 
 

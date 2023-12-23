@@ -15,7 +15,7 @@ from embeddings_cache import EMBS
 from models import BERT4SeqClf
 from phevals import PostHocAccuracy
 from groups import get_text_groups
-from lime_corrclust import CREW
+from crew_impl import CREW
 from my_corrclust import cc_weights
 from prefix_words import prefix_words_to_feature, get_words_attrs_mask
 from utils import set_seed, uniquify, EXEC_TIME_PROFILER, bindump
@@ -69,7 +69,7 @@ def crew(args):
 
     pred_probs_ls = []
 
-    _lime_corrclust = CREW(args, model, tokenizer, lime_cache)
+    crew_ = CREW(args, model, tokenizer, lime_cache)
     if lime_cache is None:
         lime_cache = [[], [], []]
 
@@ -92,10 +92,10 @@ def crew(args):
         segments_ids_ = batch[2]
 
         logits = model.predict(None, input_ids_, attention_mask_, segments_ids_, args.wordpieced)
-        logits = logits.detach().cpu().numpy()
-        pred = logits.argmax(axis=1)
+        logits = logits.detach().cpu().numpy()[0]
+        y_true = logits.argmax()
 
-        idxs, word_scores, groups, group_scores = _lime_corrclust.explain(
+        idxs, word_scores, groups, group_scores = crew_.explain(
             prefix_words_, attrs_mask, segments_ids, count)
 
         if len(idxs) == len(prefix_words_):
@@ -111,14 +111,16 @@ def crew(args):
 
         pred_probs = pred_probs[0].tolist()
         pred_probs_ls.append(pred_probs)
-        expl_pred = np.argmax(pred_probs)
+        y_pred = np.argmax(pred_probs)
 
         if not lime_cached:
             lime_cache[0].append([prefix_words_[i] for i in idxs])
-            lime_cache[1].append(word_scores.tolist())
+            lime_cache[1].append(word_scores
+                                 # .tolist()
+                                 )
             lime_cache[2].append(pred_probs)
 
-        acc.append(pred[0], expl_pred)
+        acc.append(y_true, y_pred)
 
         wout.add_rows(count,
                       impact=word_scores,

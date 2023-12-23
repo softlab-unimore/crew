@@ -18,21 +18,19 @@ def indexes_to_prefix_words(idxs, words):
 
 
 def get_idx(prefix_word: str) -> int:
-    # return int(re.match('\d_\d+_(\d+)_', prefix_word).group(1))
-    return int(re.match('(\d+)_', prefix_word).group(1))
+    return int(re.match(r'(\d+)_', prefix_word).group(1))
 
 
 def get_word(prefix_word: str) -> str:
-    # return re.sub('\d_\d+_\d+_', '', prefix_word)
-    return re.sub('\d+_', '', prefix_word)
+    return re.sub(r'\d+_', '', prefix_word)
 
 
 def get_words_attrs_mask(
         input_ids: torch.Tensor, segment_ids: torch.Tensor, attrs_mask: torch.Tensor, tokenizer, wordpieced: bool,
 ) -> (list, list, list, list, list, list):
     words = []
-    for id in input_ids:
-        words.append(tokenizer.ids_to_tokens[int(id)])
+    for i in input_ids:
+        words.append(tokenizer.ids_to_tokens[int(i)])
 
     words_a, words_b, attrs_mask_a, attrs_mask_b = words_seq_to_pair(segment_ids, words, attrs_mask)
     if not wordpieced:

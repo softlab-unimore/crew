@@ -1,27 +1,26 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-import torch
-from torcheval.metrics.functional import multiclass_f1_score
+from sklearn.metrics import f1_score
 
 
 class PostHocAccuracy:
 
     def __init__(self):
-        self.X_true, self.X_pred = [], []
+        self.y_true, self.y_pred = [], []
 
-    def append(self, x_true: int, x_pred: int):
-        self.X_true.append(x_true)
-        self.X_pred.append(x_pred)
+    def append(self, y_true: int, y_pred: int):
+        self.y_true.append(y_true)
+        self.y_pred.append(y_pred)
 
     def clear(self):
-        self.X_true = []
-        self.X_pred = []
+        self.y_true = []
+        self.y_pred = []
 
     def get_score(self):
-        X_true = np.array(self.X_pred)
-        X_pred = np.array(self.X_pred)
-        return (X_true == X_pred).astype(float).mean()
+        y_true = np.array(self.y_pred)
+        y_pred = np.array(self.y_pred)
+        return (y_true == y_pred).astype(float).mean()
 
 
 class DegradPredict(ABC):
@@ -41,28 +40,33 @@ class DegradPredict(ABC):
 
 class DegradationMetric(ABC):
 
-    def __init__(self, degrad_pct_step=0., degrad_pcts: list[float] = None, top_u=0, degrad_idxs: list[int] = None):
+    def __init__(self, degrad_pct_step=0.,
+                 # degrad_pcts: list[float] = None,
+                 top_u=0,
+                 # degrad_idxs: list[int] = None
+                 ):
         if degrad_pct_step > 0.:
-            self.degrad_pcts = [degrad_pct_step * i for i in range(int(1. / degrad_pct_step), 0, -1)]
-            self.degrad_pcts.reverse()
+            # self.degrad_pcts = [degrad_pct_step * i for i in range(int(1. / degrad_pct_step), 0, -1)]
+            # self.degrad_pcts.reverse()
+            self.degrad_pcts = [degrad_pct_step * i for i in range(1, int(1. / degrad_pct_step) + 1)]
             self.top_u = 0
             self.degrad_idxs = None
             self.degrad_steps = self.degrad_pcts
-        elif degrad_pcts:
-            self.degrad_pcts = degrad_pcts
-            self.top_u = 0
-            self.degrad_idxs = None
-            self.degrad_steps = self.degrad_pcts
+        # elif degrad_pcts:
+        #     self.degrad_pcts = degrad_pcts
+        #     self.top_u = 0
+        #     self.degrad_idxs = None
+        #     self.degrad_steps = self.degrad_pcts
         elif top_u > 0:
             self.degrad_pcts = None
             self.top_u = top_u
             self.degrad_idxs = [*range(1, top_u + 1)]
             self.degrad_steps = self.degrad_idxs
-        elif degrad_idxs:
-            self.degrad_pcts = None
-            self.top_u = 0
-            self.degrad_idxs = degrad_idxs.sort()
-            self.degrad_steps = self.degrad_idxs
+        # elif degrad_idxs:
+        #     self.degrad_pcts = None
+        #     self.top_u = 0
+        #     self.degrad_idxs = degrad_idxs.sort()
+        #     self.degrad_steps = self.degrad_idxs
         # else:
         #     # raise exception
 
@@ -84,8 +88,16 @@ class DegradationMetric(ABC):
 
 class AOPC(DegradationMetric):
 
-    def __init__(self, degrad_pct_step=0., degrad_pcts: list[float] = None, top_u=0, degrad_idxs: list[int] = None):
-        super().__init__(degrad_pct_step, degrad_pcts, top_u, degrad_idxs)
+    def __init__(self, degrad_pct_step=0.,
+                 # degrad_pcts: list[float] = None,
+                 top_u=0,
+                 # degrad_idxs: list[int] = None
+                 ):
+        super().__init__(degrad_pct_step,
+                         # degrad_pcts,
+                         top_u,
+                         # degrad_idxs
+                         )
 
         self.y_preds = []
         self.y_pred_probs = []
@@ -143,8 +155,16 @@ class AOPC(DegradationMetric):
 
 class DegradationScoreF1(DegradationMetric):
 
-    def __init__(self, degrad_pct_step=0., degrad_pcts: list[float] = None, top_u=0, degrad_idxs: list[int] = None):
-        super().__init__(degrad_pct_step, degrad_pcts, top_u, degrad_idxs)
+    def __init__(self, degrad_pct_step=0.,
+                 # degrad_pcts: list[float] = None,
+                 top_u=0,
+                 # degrad_idxs: list[int] = None
+                 ):
+        super().__init__(degrad_pct_step,
+                         # degrad_pcts,
+                         top_u,
+                         # degrad_idxs
+                         )
 
         self.morf = []
         self.lerf = []
@@ -162,7 +182,9 @@ class DegradationScoreF1(DegradationMetric):
         self._morf_f1 = None
 
     def append(self, degrad_predict: DegradPredict):#, y_true: int):
-        y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0).detach().cpu().numpy())
+        y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0)
+                           # .detach().cpu().numpy()
+                           )
         self.true.append(y_true)
         morf_degrads, lerf_degrads = [], []
 
@@ -170,27 +192,22 @@ class DegradationScoreF1(DegradationMetric):
             for p in self.degrad_pcts:
                 if p > 0.:
                     degrad_probs = degrad_predict.get_degrad_probs(0, p, True)
-                    degrad_pred = torch.argmax(degrad_probs)
-                    morf_degrads.append(int(degrad_pred))
+                    degrad_pred = np.argmax(degrad_probs)
+                    morf_degrads.append(degrad_pred)
 
                     degrad_probs = degrad_predict.get_degrad_probs(0, p, False)
-                    degrad_pred = torch.argmax(degrad_probs)
-                    lerf_degrads.append(int(degrad_pred))
+                    degrad_pred = np.argmax(degrad_probs)
+                    lerf_degrads.append(degrad_pred)
         elif self.degrad_idxs:
             for i in self.degrad_idxs:
                 if i <= degrad_predict.size():
                     degrad_probs = degrad_predict.get_degrad_probs(i, 0, True)
-                    degrad_pred = torch.argmax(degrad_probs)
-                else:
-                    degrad_pred = -1
-                morf_degrads.append(int(degrad_pred))
+                    degrad_pred = np.argmax(degrad_probs)
+                    morf_degrads.append(degrad_pred)
 
-                if i <= degrad_predict.size():
                     degrad_probs = degrad_predict.get_degrad_probs(i, 0, False)
-                    degrad_pred = torch.argmax(degrad_probs)
-                else:
-                    degrad_pred = -1
-                lerf_degrads.append(int(degrad_pred))
+                    degrad_pred = np.argmax(degrad_probs)
+                    lerf_degrads.append(degrad_pred)
 
         self.morf.append(morf_degrads)
         self.lerf.append(lerf_degrads)
@@ -201,20 +218,20 @@ class DegradationScoreF1(DegradationMetric):
 
     def get_lerf_f1(self):
         if self._lerf_f1 is None:
-            lerf = torch.transpose(torch.tensor(self.lerf), 0, 1)
+            lerf = np.transpose(np.array(self.lerf))
             lerf_f1 = []
-            true = torch.tensor(self.true)
+            true = np.array(self.true)
             for l in lerf:
-                lerf_f1.append(multiclass_f1_score(l, true, num_classes=2))
-            self._lerf_f1 = torch.tensor(lerf_f1).detach().cpu().numpy()
+                lerf_f1.append(f1_score(l, true))
+            self._lerf_f1 = np.array(lerf_f1)
         return self._lerf_f1
 
     def get_morf_f1(self):
         if self._morf_f1 is None:
-            morf = torch.transpose(torch.tensor(self.morf), 0, 1)
+            morf = np.transpose(np.array(self.morf))
             morf_f1 = []
-            true = torch.tensor(self.true)
+            true = np.array(self.true)
             for m in morf:
-                morf_f1.append(multiclass_f1_score(m, true, num_classes=2))
-            self._morf_f1 = torch.tensor(morf_f1).detach().cpu().numpy()
+                morf_f1.append(f1_score(m, true))
+            self._morf_f1 = np.array(morf_f1)
         return self._morf_f1
