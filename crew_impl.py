@@ -4,7 +4,7 @@ import numpy as np
 from lime.lime_text import LimeTextExplainer
 
 from groups import get_text_groups
-from interpret_lime import WordsClassifier, GroupsClassifier
+from ptb_classifiers import WordsClassifier, GroupsClassifier
 from models import ModelWrapper
 from my_corrclust import get_cc_scores_table
 from prefix_words import get_idx, get_word

@@ -40,3 +40,19 @@ Optional arguments:
 -  `--lime_n_word_features` : maximum number of features present in explanation [LIME]
 -  `--gpu` : if `True`, run on GPU. If `False`, run on CPU
 -  `-seed`, `--seed`
+
+
+## Degradation score
+
+To evaluate the degradation score on a particular experiment, run:
+
+```python
+degra.py [-h] [--exp_path EXP_PATH] [--model_path MODEL_PATH] [--degra_step DEGRA_STEP] 
+         [--gpu {True,False}]
+```
+
+Arguments:
+-  `--exp_path` : The directory with the explanation and additional outputs.
+-  `--model_path` : The directory with the model
+-  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels
+-  `--gpu` : if `True`, run on GPU. If `False`, run on CPU

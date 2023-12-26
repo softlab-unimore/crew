@@ -109,7 +109,7 @@ def crew(args):
             logits_ = model.predict(None, input_ids_, attention_mask_, segment_ids_, args.wordpieced)
             pred_probs = logits_.detach().cpu().numpy()
 
-        pred_probs = pred_probs[0].tolist()
+        pred_probs = pred_probs.tolist()
         pred_probs_ls.append(pred_probs)
         y_pred = np.argmax(pred_probs)
 

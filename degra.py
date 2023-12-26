@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pickle
 
@@ -15,7 +16,7 @@ from crew_degra import CReWDegradPredict, CReWDegradPredictGroups
 from phevals import DegradationScoreF1
 
 
-def degra(exp_path, model_path, device='cuda', do_lower_case=True):
+def degra(exp_path: str, model_path: str, degra_step: float, device='cuda', do_lower_case=True):
     with open(exp_path + '/wexpls', 'rb') as f:
         wexpls = pickle.load(f)
 
@@ -31,7 +32,7 @@ def degra(exp_path, model_path, device='cuda', do_lower_case=True):
     model = BERT4SeqClf(model, tokenizer, device, model.bert)
     EMBS.work_with(model)
 
-    w_degrad_score, g_degrad_score = DegradationScoreF1(.10), DegradationScoreF1(.10)
+    w_degrad_score, g_degrad_score = DegradationScoreF1(degra_step), DegradationScoreF1(degra_step)
 
     for inx in tqdm(wexpls['data_inx'].unique()):
         wexpl = wexpls[wexpls['data_inx'] == inx]
@@ -51,10 +52,8 @@ def degra(exp_path, model_path, device='cuda', do_lower_case=True):
 
         newkeys = dict()
         for i, k in enumerate(sorted(l_words_dt.keys())):
-            # newkeys[k] = i + 1
             newkeys[k] = i
         for i, k in enumerate(sorted(r_words_dt.keys())):
-            # newkeys[k] = i + 1 + len(l_words_dt) + 1
             newkeys[k] = i + len(l_words_dt)
 
         wids_desc_imp = [wid for wid, _ in sorted(wids_desc_imp, key=lambda x: x[1], reverse=True)]
@@ -62,8 +61,6 @@ def degra(exp_path, model_path, device='cuda', do_lower_case=True):
 
         l_words = [l_words_dt[k] for k in sorted(l_words_dt.keys())]
         r_words = [r_words_dt[k] for k in sorted(r_words_dt.keys())]
-        # words = np.array(['[CLS]'] + l_words + ['[SEP]'] + r_words + ['[SEP]'])
-        # segments = np.array([0] + [0] * len(l_words) + [0] + [1] * len(r_words) + [1])
         words = np.array(l_words + r_words)
         segments = np.array([0] * len(l_words) + [1] * len(r_words))
 
@@ -90,10 +87,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--exp_path', type=str, default='./output/beer/crew_00',
-                        help='The directory with the explanation.')
+                        help='The directory with the explanation')
     parser.add_argument('--model_path', type=str, default='./../GMASK/BERT_GMASK/model/beer',
                         help='The directory with the model')
-
+    parser.add_argument('--degra_step', type=float, default=0.1,
+                        help='The percentage step between two degradation levels. 100% divided by this step should'
+                             'be an integer number, that is the number of degradation levels')
     parser.add_argument('--gpu', default=True, choices=[True, False], type=bool,
                         help='True: GPU, False: CPU')
 
@@ -108,7 +107,7 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = '0'
         torch.cuda.empty_cache()
 
-    w_degra, g_degra = degra(args.exp_path, args.model_path, args.device, args.do_lower_case)
+    w_degra, g_degra = degra(args.exp_path, args.model_path, args.degra_step, args.device, args.do_lower_case)
 
     res = {
         'degrad_score': g_degra.get_score(),
@@ -116,5 +115,5 @@ if __name__ == '__main__':
         'lerf_f1': g_degra.get_lerf_f1().tolist(),
         'morf_f1': g_degra.get_morf_f1().tolist(),
     }
-    print(res)
+    print(json.dumps(res, indent=2))
     bindump(res, f'{args.exp_path}/degrad_score.pkl')

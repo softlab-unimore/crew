@@ -40,33 +40,17 @@ class DegradPredict(ABC):
 
 class DegradationMetric(ABC):
 
-    def __init__(self, degrad_pct_step=0.,
-                 # degrad_pcts: list[float] = None,
-                 top_u=0,
-                 # degrad_idxs: list[int] = None
-                 ):
+    def __init__(self, degrad_pct_step=0., top_u=0):
         if degrad_pct_step > 0.:
-            # self.degrad_pcts = [degrad_pct_step * i for i in range(int(1. / degrad_pct_step), 0, -1)]
-            # self.degrad_pcts.reverse()
             self.degrad_pcts = [degrad_pct_step * i for i in range(1, int(1. / degrad_pct_step) + 1)]
             self.top_u = 0
             self.degrad_idxs = None
             self.degrad_steps = self.degrad_pcts
-        # elif degrad_pcts:
-        #     self.degrad_pcts = degrad_pcts
-        #     self.top_u = 0
-        #     self.degrad_idxs = None
-        #     self.degrad_steps = self.degrad_pcts
         elif top_u > 0:
             self.degrad_pcts = None
             self.top_u = top_u
             self.degrad_idxs = [*range(1, top_u + 1)]
             self.degrad_steps = self.degrad_idxs
-        # elif degrad_idxs:
-        #     self.degrad_pcts = None
-        #     self.top_u = 0
-        #     self.degrad_idxs = degrad_idxs.sort()
-        #     self.degrad_steps = self.degrad_idxs
         # else:
         #     # raise exception
 
@@ -88,16 +72,8 @@ class DegradationMetric(ABC):
 
 class AOPC(DegradationMetric):
 
-    def __init__(self, degrad_pct_step=0.,
-                 # degrad_pcts: list[float] = None,
-                 top_u=0,
-                 # degrad_idxs: list[int] = None
-                 ):
-        super().__init__(degrad_pct_step,
-                         # degrad_pcts,
-                         top_u,
-                         # degrad_idxs
-                         )
+    def __init__(self, degrad_pct_step=0., top_u=0):
+        super().__init__(degrad_pct_step, top_u)
 
         self.y_preds = []
         self.y_pred_probs = []
@@ -155,16 +131,8 @@ class AOPC(DegradationMetric):
 
 class DegradationScoreF1(DegradationMetric):
 
-    def __init__(self, degrad_pct_step=0.,
-                 # degrad_pcts: list[float] = None,
-                 top_u=0,
-                 # degrad_idxs: list[int] = None
-                 ):
-        super().__init__(degrad_pct_step,
-                         # degrad_pcts,
-                         top_u,
-                         # degrad_idxs
-                         )
+    def __init__(self, degrad_pct_step=0., top_u=0):
+        super().__init__(degrad_pct_step, top_u)
 
         self.morf = []
         self.lerf = []
@@ -181,10 +149,8 @@ class DegradationScoreF1(DegradationMetric):
         self._lerf_f1 = None
         self._morf_f1 = None
 
-    def append(self, degrad_predict: DegradPredict):#, y_true: int):
-        y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0)
-                           # .detach().cpu().numpy()
-                           )
+    def append(self, degrad_predict: DegradPredict):
+        y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0))
         self.true.append(y_true)
         morf_degrads, lerf_degrads = [], []
 
