@@ -56,3 +56,19 @@ Arguments:
 -  `--model_path` : The directory with the model
 -  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels
 -  `--gpu` : if `True`, run on GPU. If `False`, run on CPU
+
+This command creates a binary file, `degrad_score`, in the explanation path. This file contains a dictionary with the degradation score alongside the information to plot the LERF and MORF curves. To do so, run the following cell in a notebook:
+
+```python
+with open(f'{exp_path}/degrad_score', 'rb') as f:
+    degradict = pickle.load(f)
+steps   = degradict['degrad_steps']
+lerf_f1 = degradict['lerf_f1']
+morf_f1 = degradict['morf_f1']
+steps   = [0.] + steps
+lerf_f1 = [1.] + lerf_f1
+morf_f1 = [1.] + morf_f1
+plt.plot(steps, lerf_f1, label='lerf', marker='o')
+plt.plot(steps, morf_f1, label='morf', marker='o')
+plt.show()
+```
