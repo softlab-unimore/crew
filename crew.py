@@ -17,7 +17,7 @@ from phevals import PostHocAccuracy
 from groups import get_text_groups
 from crew_impl import CREW
 from my_corrclust import cc_weights
-from prefix_words import prefix_words_to_feature, get_words_attrs_mask
+from prefix_words import prefix_words_to_feature, get_words_attrs_mask, prefix_words_to_features
 from utils import set_seed, uniquify, EXEC_TIME_PROFILER, bindump
 
 
@@ -102,7 +102,8 @@ def crew(args):
             pred_probs = logits
         else:
             top_prefix_words = [prefix_words_[i] for i in idxs]
-            f = prefix_words_to_feature(top_prefix_words, segments_ids, tokenizer, args.wordpieced, args.max_seq_length)
+            f = prefix_words_to_features([top_prefix_words], [segments_ids], tokenizer,
+                                         args.wordpieced, args.max_seq_length)[0]
             input_ids_ = torch.tensor([f.input_ids], device=args.device)
             attention_mask_ = torch.tensor([f.input_mask], device=args.device)
             segment_ids_ = torch.tensor([f.segment_ids], device=args.device)
