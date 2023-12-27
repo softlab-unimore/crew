@@ -26,8 +26,8 @@ crew.py [-h] [--semantic {True,False}] [--importance {True,False}] [--schema {Tr
 
 Positional arguments:
 -  `data_dir` : The directory with the input data.
--  `model_dir` : The directory with the model
--  `output_dir` : The directory in which the explanations and other additional outputs will be saved
+-  `model_dir` : The directory with the model.
+-  `expls_dir` : The directory in which the explanations and other additional outputs will be saved.
 
 Optional arguments:
 -  `--semantic` : Include semantic relatedness
@@ -47,15 +47,16 @@ Optional arguments:
 To evaluate the degradation score on a particular experiment, run:
 
 ```python
-degra.py [-h] [--exp_path EXP_PATH] [--model_path MODEL_PATH] [--degra_step DEGRA_STEP] 
-         [--gpu {True,False}]
+degra.py [-h] [--degra_step STEP] [--gpu {True,False}] exp_path model_path
 ```
 
-Arguments:
--  `--exp_path` : The directory with the explanation and additional outputs.
--  `--model_path` : The directory with the model
--  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels
--  `--gpu` : if `True`, run on GPU. If `False`, run on CPU
+Positional arguments:
+-  `expls_dir` : The directory with the explanation and additional outputs.
+-  `model_dir` : The directory with the model.
+
+Optional arguments:
+-  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels. By default is `0.10` (10%).
+-  `--gpu` : if `True`, run on GPU. If `False`, run on CPU. By default is `True`.
 
 This command creates a binary file, `degrad_score`, in the explanation path. This file contains a dictionary with the degradation score alongside the information to plot the LERF and MORF curves. To do so, run the following cell in a notebook:
 
@@ -81,7 +82,7 @@ To render an explanation in a .html file, run:
 visualize.py [-h] expls_dir data_inx visual_dir
 ```
 
-Arguments:
+Positional arguments:
 -  `expls_dir` : The directory with the explanations and additional outputs.
 -  `data_inx` : The indexes of the pairs of entity descriptions for which to render the explanation. If -1, render all the explanations.
 -  `visual_dir` : The directory where to write the .html that renders the explanation.
