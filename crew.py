@@ -39,7 +39,7 @@ def crew(args):
 
     dataset = load_and_cache_examples(args, args.task_name, tokenizer, 'test')
 
-    exp_dir = uniquify(f'{args.output_dir}/{args.model_setup}')
+    exp_dir = uniquify(f'{args.expls_dir}/{args.model_setup}')
     os.makedirs(exp_dir)
     with open(f'{exp_dir}/args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
@@ -161,10 +161,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('data_dir', type=str,
-                        help='The directory with the input data.')
+                        help='The directory with the input data')
     parser.add_argument('model_dir', type=str,
                         help='The directory with the model')
-    parser.add_argument('output_dir', type=str,
+    parser.add_argument('expls_dir', type=str,
                         help='The directory in which the explanations and other additional outputs will be saved')
 
     parser.add_argument('--semantic', type=bool, choices=[True, False], default=True,

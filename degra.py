@@ -86,15 +86,15 @@ def degra(exp_path: str, model_path: str, degra_step: float, device='cuda', do_l
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--exp_path', type=str, default='./output/beer/crew_00',
-                        help='The directory with the explanation')
-    parser.add_argument('--model_path', type=str, default='./../GMASK/BERT_GMASK/model/beer',
-                        help='The directory with the model')
+    parser.add_argument('exp_path', type=str, #default='./output/beer/crew_00',
+                        help='The directory with the explanations.')
+    parser.add_argument('model_path', type=str, #default='./../GMASK/BERT_GMASK/model/beer',
+                        help='The directory with the model.')
     parser.add_argument('--degra_step', type=float, default=0.1,
                         help='The percentage step between two degradation levels. 100% divided by this step should'
-                             'be an integer number, that is the number of degradation levels')
+                             'be an integer number, that is the number of degradation levels.')
     parser.add_argument('--gpu', default=True, choices=[True, False], type=bool,
-                        help='True: GPU, False: CPU')
+                        help='True: GPU, False: CPU.')
 
     parser.add_argument("-f", "--file", required=False)  # colab
 
@@ -116,4 +116,4 @@ if __name__ == '__main__':
         'morf_f1': g_degra.get_morf_f1().tolist(),
     }
     print(json.dumps(res, indent=2))
-    bindump(res, f'{args.exp_path}/degrad_score.pkl')
+    bindump(res, f'{args.exp_path}/degrad_score')
