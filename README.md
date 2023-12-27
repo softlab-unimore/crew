@@ -72,3 +72,23 @@ plt.plot(steps, lerf_f1, label='lerf', marker='o')
 plt.plot(steps, morf_f1, label='morf', marker='o')
 plt.show()
 ```
+
+## Render explanations
+
+To render an explanation in a .html file, run: 
+
+```python
+visualize.py [-h] expls_dir data_inx visual_dir
+```
+
+Arguments:
+-  `expls_dir` : The directory with the explanations and additional outputs.
+-  `data_inx` : The indexes of the pairs of entity descriptions for which to render the explanation. If -1, render all the explanations.
+-  `visual_dir` : The directory where to write the .html that renders the explanation.
+
+Inside `visual_dir`, the command creates two folders, `wexpls` and `gexpls`, containing the word-level and group-level renderer explanations respectively.
+Each rendered explanation is a .html file, such as `expl11.html`, with `11` being the index of the EM record in the original dataset.
+
+| Word-level explanation                                                                                  | Group-level explanation                                                                                 |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ![wexpl](https://github.com/softlab-unimore/crew/assets/100861187/88ae0b53-7057-4d77-a9f2-181e36b04027) | ![gexpl](https://github.com/softlab-unimore/crew/assets/100861187/92647b7c-917d-481f-8b7c-61009a8bab84) |
