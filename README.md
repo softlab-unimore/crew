@@ -26,19 +26,19 @@ crew.py [-h] [--semantic {True,False}] [--importance {True,False}] [--schema {Tr
 
 Positional arguments:
 -  `data_dir` : The directory with the input data.
--  `model_dir` : The directory with the model
--  `output_dir` : The directory in which the explanations and other additional outputs will be saved
+-  `model_dir` : The directory with the model.
+-  `expls_dir` : The directory in which the explanations and other additional outputs will be saved.
 
 Optional arguments:
--  `--semantic` : Include semantic relatedness
--  `--importance` : Include importance relatedness
--  `--schema` : Include schema relatedness
--  `--wordpieced` : if `True`, tokenize the output. If `False`, preserve original words
--  `--max_seq_length` : The maximum total length of the tokenized input sequence. Sequences longer than this will be truncated, and sequences shorter will be padded.
--  `--lime_n_word_samples` : number of perturbed samples to learn a word-level explanation [LIME]
--  `--lime_n_group_samples` : number of perturbed samples to learn a group-level explanation [LIME]
--  `--lime_n_word_features` : maximum number of features present in explanation [LIME]
--  `--gpu` : if `True`, run on GPU. If `False`, run on CPU
+-  `--semantic` : Include semantic relatedness. By default is `True`.
+-  `--importance` : Include importance relatedness. By default is `True`.
+-  `--schema` : Include schema relatedness. By default is `True`.
+-  `--wordpieced` : if `True`, tokenize the output. If `False`, preserve original words. By default is `False`.
+-  `--max_seq_length` : The maximum total length of the tokenized input sequence. Sequences longer than this will be truncated, and sequences shorter will be padded. By default is `False`.
+-  `--lime_n_word_samples` : number of perturbed samples to learn a word-level explanation [LIME]. By default is `1000`.
+-  `--lime_n_group_samples` : number of perturbed samples to learn a group-level explanation [LIME]. By default is `200`.
+-  `--lime_n_word_features` : maximum number of features present in explanation [LIME]. By default is `70`.
+-  `--gpu` : if `True`, run on GPU. If `False`, run on CPU. By default is `True`.
 -  `-seed`, `--seed`
 
 
@@ -47,12 +47,49 @@ Optional arguments:
 To evaluate the degradation score on a particular experiment, run:
 
 ```python
-degra.py [-h] [--exp_path EXP_PATH] [--model_path MODEL_PATH] [--degra_step DEGRA_STEP] 
-         [--gpu {True,False}]
+degra.py [-h] [--degra_step STEP] [--gpu {True,False}] exp_path model_path
 ```
 
-Arguments:
--  `--exp_path` : The directory with the explanation and additional outputs.
--  `--model_path` : The directory with the model
--  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels
--  `--gpu` : if `True`, run on GPU. If `False`, run on CPU
+Positional arguments:
+-  `expls_dir` : The directory with the explanation and additional outputs.
+-  `model_dir` : The directory with the model.
+
+Optional arguments:
+-  `--degra_step` : The percentage step between two degradation levels. 100% divided by this step should be an integer number, that is the number of degradation levels. By default is `0.10` (10%).
+-  `--gpu` : if `True`, run on GPU. If `False`, run on CPU. By default is `True`.
+
+This command creates a binary file, `degrad_score`, in the explanation path. This file contains a dictionary with the degradation score alongside the information to plot the LERF and MORF curves. To do so, run the following cell in a notebook:
+
+```python
+with open(f'{exp_path}/degrad_score', 'rb') as f:
+    degradict = pickle.load(f)
+steps   = degradict['degrad_steps']
+lerf_f1 = degradict['lerf_f1']
+morf_f1 = degradict['morf_f1']
+steps   = [0.] + steps
+lerf_f1 = [1.] + lerf_f1
+morf_f1 = [1.] + morf_f1
+plt.plot(steps, lerf_f1, label='lerf', marker='o')
+plt.plot(steps, morf_f1, label='morf', marker='o')
+plt.show()
+```
+
+## Render explanations
+
+To render an explanation in a .html file, run: 
+
+```python
+render.py [-h] expls_dir data_inx render_dir
+```
+
+Positional arguments:
+-  `expls_dir` : The directory with the explanations and additional outputs.
+-  `data_inx` : The indexes of the pairs of entity descriptions for which to render the explanation. If -1, render all the explanations.
+-  `render_dir` : The directory where to write the .html that renders the explanation.
+
+Inside `render_dir`, the command creates two folders, `wexpls` and `gexpls`, containing the word-level and group-level renderer explanations respectively.
+Each rendered explanation is a .html file, such as `expl11.html`, with `11` being the index of the EM record in the original dataset.
+
+| Word-level explanation                                                                                  | Group-level explanation                                                                                 |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ![wexpl](https://github.com/softlab-unimore/crew/assets/100861187/88ae0b53-7057-4d77-a9f2-181e36b04027) | ![gexpl](https://github.com/softlab-unimore/crew/assets/100861187/92647b7c-917d-481f-8b7c-61009a8bab84) |
