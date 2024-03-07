@@ -131,73 +131,68 @@ class AOPC(DegradationMetric):
 
 class DegradationScoreF1(DegradationMetric):
 
-    def __init__(self, degrad_pct_step=0., top_u=0):
-        super().__init__(degrad_pct_step, top_u)
+    def __init__(self, degrad_pct_step, average='micro', pos_label=1):
+        super().__init__(degrad_pct_step)
+        self.average = average
+        self.pos_label = pos_label
+        self.changed = True
 
-        self.morf = []
-        self.lerf = []
-        self.true = []
+        self._morf_labels_mtx = []
+        self._lerf_labels_mtx = []
+        self._true = []
 
-        self._lerf_f1 = None
-        self._morf_f1 = None
+        self._lerf_curve = []
+        self._morf_curve = []
 
     def clear(self):
-        self.morf = []
-        self.lerf = []
-        self.true = []
+        self._morf_labels_mtx = []
+        self._lerf_labels_mtx = []
+        self._true = []
 
-        self._lerf_f1 = None
-        self._morf_f1 = None
+        self._lerf_curve = []
+        self._morf_curve = []
 
     def append(self, degrad_predict: DegradPredict):
         y_true = np.argmax(degrad_predict.get_degrad_probs(0, 0))
-        self.true.append(y_true)
-        morf_degrads, lerf_degrads = [], []
+        self._true.append(y_true)
+        morf_labels, lerf_labels = [], []
 
-        if self.degrad_pcts:
-            for p in self.degrad_pcts:
-                if p > 0.:
-                    degrad_probs = degrad_predict.get_degrad_probs(0, p, True)
-                    degrad_pred = np.argmax(degrad_probs)
-                    morf_degrads.append(degrad_pred)
+        for p in self.degrad_pcts:
+            if p > 0.:
+                probs = degrad_predict.get_degrad_probs(0, p, True)
+                label = np.argmax(probs)
+                morf_labels.append(label)
 
-                    degrad_probs = degrad_predict.get_degrad_probs(0, p, False)
-                    degrad_pred = np.argmax(degrad_probs)
-                    lerf_degrads.append(degrad_pred)
-        elif self.degrad_idxs:
-            for i in self.degrad_idxs:
-                if i <= degrad_predict.size():
-                    degrad_probs = degrad_predict.get_degrad_probs(i, 0, True)
-                    degrad_pred = np.argmax(degrad_probs)
-                    morf_degrads.append(degrad_pred)
+                probs = degrad_predict.get_degrad_probs(0, p, False)
+                label = np.argmax(probs)
+                lerf_labels.append(label)
 
-                    degrad_probs = degrad_predict.get_degrad_probs(i, 0, False)
-                    degrad_pred = np.argmax(degrad_probs)
-                    lerf_degrads.append(degrad_pred)
+        self._morf_labels_mtx.append(morf_labels)
+        self._lerf_labels_mtx.append(lerf_labels)
+        self.changed = True
 
-        self.morf.append(morf_degrads)
-        self.lerf.append(lerf_degrads)
+    def _curves(self):
+        if self.changed:
+            self._lerf_curve = self.get_degrad_curve(self._lerf_labels_mtx)
+            self._morf_curve = self.get_degrad_curve(self._morf_labels_mtx)
+            self.changed = False
 
     def get_score(self):
-        degrad_scores = self.get_lerf_f1() - self.get_morf_f1()
-        return degrad_scores.mean()
+        degrad_score = self.get_lerf_f1() - self.get_morf_f1()
+        return degrad_score.mean()
 
     def get_lerf_f1(self):
-        if self._lerf_f1 is None:
-            lerf = np.transpose(np.array(self.lerf))
-            lerf_f1 = []
-            true = np.array(self.true)
-            for l in lerf:
-                lerf_f1.append(f1_score(l, true))
-            self._lerf_f1 = np.array(lerf_f1)
-        return self._lerf_f1
+        self._curves()
+        return self._lerf_curve
 
     def get_morf_f1(self):
-        if self._morf_f1 is None:
-            morf = np.transpose(np.array(self.morf))
-            morf_f1 = []
-            true = np.array(self.true)
-            for m in morf:
-                morf_f1.append(f1_score(m, true))
-            self._morf_f1 = np.array(morf_f1)
-        return self._morf_f1
+        self._curves()
+        return self._morf_curve
+
+    def get_degrad_curve(self, degrad_labels_mtx):
+        degrad_labels_mtx = np.transpose(np.array(degrad_labels_mtx))
+        degrad_curve = []
+        true = np.array(self._true)
+        for degrad_labels in degrad_labels_mtx:
+            degrad_curve.append(f1_score(degrad_labels, true, average=self.average, pos_label=self.pos_label))
+        return np.array(degrad_curve)

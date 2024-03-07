@@ -10,6 +10,7 @@ from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, BertTokenizer
 
 import expldf
+from crew_impl_shap import CrewShap
 from data_parser import load_and_cache_examples
 from embeddings_cache import EMBS
 from models import BERT4SeqClf
@@ -17,7 +18,7 @@ from phevals import PostHocAccuracy
 from groups import get_text_groups
 from crew_impl import CREW
 from my_corrclust import cc_weights
-from prefix_words import prefix_words_to_feature, get_words_attrs_mask, prefix_words_to_features
+from prefix_words import get_words_attrs_mask, prefix_words_to_features
 from utils import set_seed, uniquify, EXEC_TIME_PROFILER, bindump
 
 
@@ -69,7 +70,8 @@ def crew(args):
 
     pred_probs_ls = []
 
-    crew_ = CREW(args, model, tokenizer, lime_cache)
+    crew_cls = CrewShap if args.attribution_method == 'shap' else CREW
+    crew_ = crew_cls(args, model, tokenizer, lime_cache)
     if lime_cache is None:
         lime_cache = [[], [], []]
 
@@ -152,7 +154,7 @@ def crew(args):
         print(k, v)
     bindump(ret, f'{exp_dir}/return.pkl')
 
-    if not lime_cached:
+    if not lime_cached and args.attribution_method != 'shap':
         bindump(lime_cache, lime_cache_path)
 
     print('All done!')
@@ -182,12 +184,14 @@ if __name__ == '__main__':
                         help="The maximum total length of the tokenized input sequence. Sequences longer than this "
                              "will be truncated, and sequences shorter will be padded.")
 
+    parser.add_argument('--attribution_method', type=str, choices=['lime', 'shap'], default='lime',
+                        help='Which underlying method to estimate the contributions')
     parser.add_argument('--lime_n_word_samples', type=int, default=1000, metavar='WS',
                         help='LIME: number of perturbed samples to learn a word-level explanation')
     parser.add_argument('--lime_n_group_samples', type=int, default=200, metavar='GS',
                         help='LIME: number of perturbed samples to learn a group-level explanation')
     parser.add_argument('--lime_n_word_features', type=int, default=70, metavar='WF',
-                        help='LIME: maximum number of features present in explanation')
+                        help='LIME: maximum number of features present in explanation')  # todo: remove lime from name
 
     parser.add_argument('--gpu', default=True, choices=[True, False], type=bool,
                         help='True: GPU, False: CPU')
@@ -207,7 +211,9 @@ if __name__ == '__main__':
 
     args.words_scorer = 'lime'
     args.group_scorer = 'corrclust'
-    args.model_setup = f'crew{"_wordpieced" if args.wordpieced else ""}'
+    args.model_setup = (f'crew'
+                        f'{"_shap" if args.attribution_method == "shap" else ""}'
+                        f'{"_wordpieced" if args.wordpieced else ""}')
     args.cc_weights = cc_weights(
         1. if args.semantic else 0.,
         1. if args.importance else 0.,

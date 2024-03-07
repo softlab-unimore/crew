@@ -13,55 +13,21 @@ from utils import EXEC_TIME_PROFILER
 from wordcorr import EmbdngWordCorr, ImpactWordCorr, SchemaWordCorr
 
 
-def groups_same_word_v1(words):
-    word_ixs = {_w: [] for _w in words}
-    for _idx, _w in enumerate(words):
-        word_ixs[_w].append(_idx)
-    if '[CLS]' in word_ixs.keys(): del word_ixs['[CLS]']
-    if '[SEP]' in word_ixs.keys(): del word_ixs['[SEP]']
-    groups = []
-    for _k, _v in word_ixs.items():
-        groups.append(_v)
-    return groups
-
-
-def groups_same_word_v2(words, mask):
-    segment_word_ixs = {s: {} for s in np.unique(mask)}
-    for _w, _s in zip(words, mask):
-        if _w == '[SEP]':
-            continue
-        if _w == '[CLS]':
-            continue
-        segment_word_ixs[_s][_w] = []
-    for _idx, (_w, _s) in enumerate(zip(words, mask)):
-        if _w == '[SEP]':
-            continue
-        if _w == '[CLS]':
-            continue
-        segment_word_ixs[_s][_w].append(_idx)
-    groups = []
-    for _, s_dict in segment_word_ixs.items():
-        for w, g in s_dict.items():
-            groups.append(g)
-    return groups
-
-
 class CREW:
 
     def __init__(self, args, model: ModelWrapper, tokenizer, lime_cache=None):
         self.args = args
         self.model = model
         self.tokenizer = tokenizer
-        # self.lime_words_explainer = MyLIMETextExplainer(
-        #     model, tokenizer, args.device, args.wordpieced,
-        #     args.lime_n_word_features, args.lime_n_word_samples,
-        #     args.max_seq_length, args.seed)
         self.explainer = LimeTextExplainer(
             class_names=['no_match', 'match'], split_expression=r'[^\w#]+', random_state=args.seed
         )
         self.wclf = WordsClassifier(model, tokenizer, args.device, args.wordpieced, args.max_seq_length)
         self.lime_n_word_samples = args.lime_n_word_samples
         self.lime_n_word_features = args.lime_n_word_features
+
+        if args.attribution_method == 'shap':
+            lime_cache = None
 
         if lime_cache is None:
             self.lime_wexpl = [[], [], []]
@@ -70,48 +36,23 @@ class CREW:
             self.lime_wexpl = lime_cache
             self.lime_cached = True
 
-        # self.lime_group_explainer = MyLIMETextExplainer(
-        #     model, tokenizer, args.device, args.wordpieced,
-        #     args.lime_n_word_features, args.lime_n_group_samples,
-        #     args.max_seq_length, args.seed)
         self.gclf = GroupsClassifier(model, tokenizer, args.device, args.wordpieced, args.max_seq_length)
         self.num_features = args.lime_n_word_features
         self.lime_n_group_samples = args.lime_n_group_samples
 
+    def _get_expl(self, clf, words, segments, num_features=0, num_samples=5000):
+        expl = self.explainer.explain_instance(' '.join(words), clf.get_classifier_fn(segments),
+                                               num_features=len(words), num_samples=num_samples)
+        if num_features <= 0: num_features = len(words)
+        expl = sorted(expl.as_list()[:num_features], key=lambda x: x[1], reverse=True)
+        return expl
+
     def explain(self, prefix_words, attrs_mask, segments_ids, count=None):
 
-        # ### v1
-        # _prefix_words = get_text_groups(groups_same_word_v1(words), prefix_words_tags)
-        #
-        # ### v2
-        # _prefix_words = get_text_groups(groups_same_word_v2(words, segments_ids.detach().cpu().numpy()), prefix_words_tags)
-        #
-        # ### v3
-        # _prefix_words = get_text_groups(groups_same_word_v2(words, attrs_mask.detach().cpu().numpy()), prefix_words_tags)
-
         if not self.lime_cached:
-            # top_prefix_words, top_scores = self.lime_words_explainer.explain(' '.join(prefix_words), segments_ids)
-            num_features = len(prefix_words)
-            expl = self.explainer.explain_instance(' '.join(prefix_words), self.wclf.get_classifier_fn(segments_ids),
-                                                   num_features=num_features, num_samples=self.lime_n_word_samples)
-            expl = sorted(expl.as_list()[:self.lime_n_word_features], key=lambda x: x[1], reverse=True)
+            expl = self._get_expl(self.wclf, prefix_words, segments_ids,
+                                  self.lime_n_word_features, self.lime_n_word_samples)
             top_prefix_words, top_scores = zip(*expl)
-
-            # __out_prefix_words = []
-            # __out_scores = []
-            # for _pw, _s in zip(top_prefix_words, top_scores):
-            #     _gr = re.sub(r'^\d+__', '', _pw).split('__')
-            #     for _pw in _gr:
-            #         __out_prefix_words.append(_pw)
-            #         __out_scores.append(_s / len(_gr))
-            # __out_prefix_words = np.array(__out_prefix_words)
-            # __out_scores = np.array(__out_scores)
-            # __arg_sort = np.argsort(__out_scores ** 2)[-self.num_features:]
-            # __out_prefix_words = __out_prefix_words[__arg_sort]
-            # __out_scores = __out_scores[__arg_sort]
-            # __arg_sort = np.argsort(__out_scores)[::-1]
-            # top_prefix_words = __out_prefix_words[__arg_sort]
-            # top_scores = __out_scores[__arg_sort]
 
         else:
             top_prefix_words = np.array(self.lime_wexpl[0][count])  # - 1])
@@ -143,11 +84,8 @@ class CREW:
             EXEC_TIME_PROFILER.timestep('corrclust')
         text_groups = get_text_groups(groups.tolist(), prefix_words)
 
-        # text_groups_by_score, groups_scores = self.lime_group_explainer.explain(" ".join(text_groups), segments_ids)
-        num_features = len(text_groups)
-        expl = self.explainer.explain_instance(' '.join(text_groups), self.gclf.get_classifier_fn(segments_ids),
-                                               num_features=num_features, num_samples=self.lime_n_group_samples)
-        expl = sorted(expl.as_list(), key=lambda x: x[1], reverse=True)
+        expl = self._get_expl(self.gclf, text_groups, segments_ids,
+                              num_samples=self.lime_n_group_samples)
         text_groups_by_score, groups_scores = zip(*expl)
         if len(groups) > 1:
             group_scores_desc_ix = [0] * len(text_groups)
